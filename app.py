@@ -1,4 +1,3 @@
-%%writefile app.py
 import os
 import streamlit as st
 import tensorflow as tf
@@ -14,7 +13,7 @@ import gdown
 
 st.set_page_config(page_title="Weather Multi-Model AI", page_icon="🌤️", layout="wide")
 
-# Hàm tự động tải file từ Google Drive nếu chưa có sẵn trên server
+# 1. Hàm tự động tải 3 mô hình từ Google Drive nếu trên server chưa có
 @st.cache_resource
 def download_models_from_drive():
     model_info = {
@@ -25,15 +24,13 @@ def download_models_from_drive():
     
     for filename, file_id in model_info.items():
         if not os.path.exists(filename):
-            url = f'https://drive.google.com/uc?id={file_id}'
-            print(f"Đang tải {filename} từ Google Drive...")
+            url = f'https://drive.google.com/uc?export=download&id={file_id}'
             gdown.download(url, filename, quiet=False)
 
-# Tiến hành kiểm tra và tải model
-with st.spinner('Đang kiểm tra và tải các mô hình từ Google Drive (quá trình này chỉ diễn ra lần đầu)...'):
+with st.spinner('Đang kiểm tra và tải các mô hình từ Google Drive (chỉ diễn ra lần đầu)...'):
     download_models_from_drive()
 
-# Cache loading models để tối ưu tốc độ
+# 2. Nạp mô hình vào bộ nhớ đệm
 @st.cache_resource
 def load_all_models():
     models = {
@@ -43,7 +40,7 @@ def load_all_models():
     }
     return models
 
-with st.spinner('Đang nạp mô hình vào bộ nhớ...'):
+with st.spinner('Đang khởi động hệ thống và nạp mô hình...'):
     models = load_all_models()
 
 class_names = ['Cloudy', 'Rain', 'Shine', 'Sunrise']
@@ -80,19 +77,19 @@ with right_col:
             with st.spinner('Đang chạy dự đoán trên cả 3 mô hình...'):
                 progress_bar = st.progress(0, text="Đang khởi tạo...")
                 
-                # InceptionV3 (299, 299)
+                # InceptionV3 chuẩn kích thước (299, 299)
                 progress_bar.progress(30, text="Đang dự đoán với InceptionV3...")
                 img_inc = img_display.resize((299, 299))
                 arr_inc = preprocess_inception(np.expand_dims(image.img_to_array(img_inc), axis=0))
                 pred_inc = models["InceptionV3"].predict(arr_inc)
                 
-                # ResNet50V2 (224, 224)
+                # ResNet50V2 chuẩn kích thước (224, 224)
                 progress_bar.progress(60, text="Đang dự đoán với ResNet50V2...")
                 img_res = img_display.resize((224, 224))
                 arr_res = preprocess_resnet(np.expand_dims(image.img_to_array(img_res), axis=0))
                 pred_res = models["ResNet50V2"].predict(arr_res)
                 
-                # EfficientNetV2S (300, 300)
+                # EfficientNetV2S chuẩn kích thước (300, 300)
                 progress_bar.progress(90, text="Đang dự đoán với EfficientNetV2S...")
                 img_eff = img_display.resize((300, 300))
                 arr_eff = preprocess_eff(np.expand_dims(image.img_to_array(img_eff), axis=0))
@@ -117,11 +114,13 @@ with right_col:
             for model_name, (cls, conf, _) in res.items():
                 st.success(f"**{model_name}:** Dự đoán là **{cls}** (Độ tin cậy: **{conf*100:.2f}%**)")
             
+            # Tìm model tốt nhất an toàn không bị lỗi tuple format
             best_model_name = max(res.items(), key=lambda x: x[1][1])[0]
             best_conf = res[best_model_name][1]
             
             st.info(f"🏆 **Model Tốt Nhất:** **{best_model_name}** với độ tự tin cao nhất (**{best_conf*100:.2f}%**)")
             
+            # Expandable section xem chi tiết xác suất
             with st.expander("📈 Xem chi tiết phân phối xác suất 4 lớp (Model tốt nhất)"):
                 best_probs = res[best_model_name][2]
                 for idx, name in enumerate(class_names):
